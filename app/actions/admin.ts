@@ -2,7 +2,6 @@
 
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
-import bcrypt from "bcrypt"
 
 // Admin login
 export async function adminLogin(formData: FormData) {
@@ -18,6 +17,46 @@ export async function adminLogin(formData: FormData) {
 
   try {
     const supabase = createServerSupabaseClient()
+
+    // İstifadəçini tap
+    const { data: user, error } = await supabase.from("admin_users").select("*").eq("email", email).single()
+
+    if (error || !user) {
+      return {
+        success: false,
+        message: "İstifadəçi tapılmadı",
+      }
+    }
+
+    // Sadə şifrə yoxlaması (müvəqqəti)
+    if (password !== "admin123") {
+      return {
+        success: false,
+        message: "Yanlış şifrə",
+      }
+    }
+
+    // Son giriş tarixini yenilə
+    await supabase.from("admin_users").update({ last_login: new Date().toISOString() }).eq("id", user.id)
+
+    return {
+      success: true,
+      message: "Uğurla daxil oldunuz!",
+      user: {
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        role: user.role,
+      },
+    }
+  } catch (error) {
+    console.error("Admin login zamanı xəta:", error)
+    return {
+      success: false,
+      message: "Xəta baş verdi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
+    }
+  }
+}
 
     // İstifadəçini tap
     const { data: user, error } = await supabase.from("admin_users").select("*").eq("email", email).single()

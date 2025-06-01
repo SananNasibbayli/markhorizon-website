@@ -3,15 +3,16 @@
 import { useState } from "react"
 import { useRouter } from "next/navigation"
 import AdminLayout from "@/components/admin-layout"
-import RichTextEditor from "@/components/rich-text-editor"
+import ImprovedRichTextEditor from "@/components/improved-rich-text-editor"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { ArrowLeft, Save, Eye } from "lucide-react"
+import { ArrowLeft, Save, Eye } from 'lucide-react'
 import Link from "next/link"
+import { saveBlogPost } from "@/app/actions/admin"
 
 export default function NewBlogPage() {
   const router = useRouter()
@@ -29,10 +30,10 @@ export default function NewBlogPage() {
   })
 
   const categories = [
-    { value: "SEO", label: "SEO" },
-    { value: "SMM", label: "SMM" },
-    { value: "Google Ads", label: "Google Ads" },
-    { value: "Digərləri", label: "Digərləri" },
+    { value: "1", label: "SEO" },
+    { value: "2", label: "SMM" },
+    { value: "3", label: "Google Ads" },
+    { value: "4", label: "Digərləri" },
   ]
 
   const handleInputChange = (field: string, value: string) => {
@@ -64,17 +65,31 @@ export default function NewBlogPage() {
     }
   }
 
-  const handleSave = (status: string) => {
-    const blogData = {
-      ...formData,
-      status,
-      date: new Date().toISOString().split("T")[0],
+  const handleSave = async (status: string) => {
+    const formDataToSend = new FormData()
+    formDataToSend.append("title", formData.title)
+    formDataToSend.append("slug", formData.slug)
+    formDataToSend.append("excerpt", formData.excerpt)
+    formDataToSend.append("content", formData.content)
+    formDataToSend.append("category", formData.category)
+    formDataToSend.append("status", status)
+    formDataToSend.append("featuredImage", formData.featuredImage)
+    formDataToSend.append("metaTitle", formData.metaTitle)
+    formDataToSend.append("metaDescription", formData.metaDescription)
+    formDataToSend.append("tags", formData.tags)
+
+    try {
+      const result = await saveBlogPost(formDataToSend)
+      if (result.success) {
+        alert(result.message)
+        router.push("/admin/blogs")
+      } else {
+        alert(result.message)
+      }
+    } catch (error) {
+      console.error("Error saving blog post:", error)
+      alert("Xəta baş verdi")
     }
-
-    console.log("Blog data:", blogData)
-    // Here you would save to your database
-
-    router.push("/admin/blogs")
   }
 
   return (
@@ -145,7 +160,7 @@ export default function NewBlogPage() {
 
                 <div>
                   <Label htmlFor="content">Məzmun *</Label>
-                  <RichTextEditor
+                  <ImprovedRichTextEditor
                     value={formData.content}
                     onChange={(value) => handleInputChange("content", value)}
                     placeholder="Məqalənin tam məzmununu yazın..."

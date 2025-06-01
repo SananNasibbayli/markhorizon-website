@@ -3,7 +3,7 @@
 import { createServerSupabaseClient } from "@/lib/supabase"
 import { revalidatePath } from "next/cache"
 
-// Admin login
+// Admin login - sadə şifrə yoxlaması
 export async function adminLogin(formData: FormData) {
   const email = formData.get("email") as string
   const password = formData.get("password") as string
@@ -15,90 +15,22 @@ export async function adminLogin(formData: FormData) {
     }
   }
 
-  try {
-    const supabase = createServerSupabaseClient()
-
-    // İstifadəçini tap
-    const { data: user, error } = await supabase.from("admin_users").select("*").eq("email", email).single()
-
-    if (error || !user) {
-      return {
-        success: false,
-        message: "İstifadəçi tapılmadı",
-      }
-    }
-
-    // Sadə şifrə yoxlaması (müvəqqəti)
-    if (password !== "admin123") {
-      return {
-        success: false,
-        message: "Yanlış şifrə",
-      }
-    }
-
-    // Son giriş tarixini yenilə
-    await supabase.from("admin_users").update({ last_login: new Date().toISOString() }).eq("id", user.id)
-
+  // Sadə admin yoxlaması
+  if (email === "admin@markhorizon.com" && password === "admin123") {
     return {
       success: true,
       message: "Uğurla daxil oldunuz!",
       user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
+        id: 1,
+        username: "admin",
+        email: "admin@markhorizon.com",
+        role: "admin",
       },
     }
-  } catch (error) {
-    console.error("Admin login zamanı xəta:", error)
+  } else {
     return {
       success: false,
-      message: "Xəta baş verdi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
-    }
-  }
-}
-
-    // İstifadəçini tap
-    const { data: user, error } = await supabase.from("admin_users").select("*").eq("email", email).single()
-
-    if (error || !user) {
-      return {
-        success: false,
-        message: "İstifadəçi tapılmadı",
-      }
-    }
-
-    // Şifrəni yoxla
-    const passwordMatch = await bcrypt.compare(password, user.password_hash)
-
-    if (!passwordMatch) {
-      return {
-        success: false,
-        message: "Yanlış şifrə",
-      }
-    }
-
-    // Son giriş tarixini yenilə
-    await supabase.from("admin_users").update({ last_login: new Date().toISOString() }).eq("id", user.id)
-
-    // Burada JWT token yaradıb cookie-də saxlaya bilərik
-    // Sadəlik üçün bu hissəni buraxırıq
-
-    return {
-      success: true,
-      message: "Uğurla daxil oldunuz!",
-      user: {
-        id: user.id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-      },
-    }
-  } catch (error) {
-    console.error("Admin login zamanı xəta:", error)
-    return {
-      success: false,
-      message: "Xəta baş verdi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
+      message: "Yanlış email və ya şifrə",
     }
   }
 }
@@ -147,11 +79,17 @@ export async function saveBlogPost(formData: FormData) {
     if (id) {
       // Mövcud məqaləni yenilə
       const { error } = await supabase.from("blog_posts").update(postData).eq("id", Number.parseInt(id))
-      if (error) throw error
+      if (error) {
+        console.error("Update error:", error)
+        throw error
+      }
     } else {
       // Yeni məqalə əlavə et
       const { error } = await supabase.from("blog_posts").insert([postData])
-      if (error) throw error
+      if (error) {
+        console.error("Insert error:", error)
+        throw error
+      }
     }
 
     revalidatePath("/admin/blogs")
@@ -177,7 +115,8 @@ export async function deleteBlogPost(id: number) {
   try {
     const supabase = createServerSupabaseClient()
 
-    await supabase.from("blog_posts").delete().eq("id", id)
+    const { error } = await supabase.from("blog_posts").delete().eq("id", id)
+    if (error) throw error
 
     revalidatePath("/admin/blogs")
     revalidatePath("/blogs")
@@ -188,47 +127,6 @@ export async function deleteBlogPost(id: number) {
     }
   } catch (error) {
     console.error("Bloq məqaləsi silinərkən xəta:", error)
-    return {
-      success: false,
-      message: "Xəta baş verdi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
-    }
-  }
-}
-
-// Sayt parametrlərini yenilə
-export async function updateSiteSettings(formData: FormData) {
-  try {
-    const supabase = createServerSupabaseClient()
-
-    // Formdan bütün parametrləri al
-    const settings: Record<string, string> = {}
-    for (const [key, value] of formData.entries()) {
-      settings[key] = value as string
-    }
-
-    // Hər bir parametr üçün upsert əməliyyatı
-    for (const [key, value] of Object.entries(settings)) {
-      await supabase.from("site_settings").upsert(
-        {
-          key,
-          value,
-          updated_at: new Date().toISOString(),
-        },
-        {
-          onConflict: "key",
-        },
-      )
-    }
-
-    revalidatePath("/admin/settings")
-    revalidatePath("/")
-
-    return {
-      success: true,
-      message: "Parametrlər uğurla yeniləndi!",
-    }
-  } catch (error) {
-    console.error("Sayt parametrləri yenilənərkən xəta:", error)
     return {
       success: false,
       message: "Xəta baş verdi. Zəhmət olmasa bir az sonra yenidən cəhd edin.",
@@ -262,12 +160,7 @@ export async function saveAITool(formData: FormData) {
 
     const toolData = {
       name,
-      slug:
-        slug ||
-        name
-          .toLowerCase()
-          .replace(/[^a-z0-9\s-]/g, "")
-          .replace(/\s+/g, "-"),
+      slug: slug || name.toLowerCase().replace(/[^a-z0-9\s-]/g, "").replace(/\s+/g, "-"),
       description,
       category_id: Number.parseInt(categoryId),
       rating: rating ? Number.parseFloat(rating) : 0,
